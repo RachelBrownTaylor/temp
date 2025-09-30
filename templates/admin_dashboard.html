@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>관리자 대시보드</h1>
+<p><a href="{{ url_for('export_results', format='csv') }}">CSV 내보내기</a> | <a href="{{ url_for('export_results', format='json') }}">JSON 내보내기</a></p>
+<h2>응시자별 결과</h2>
+<table>
+    <thead>
+        <tr>
+            <th>사용자</th>
+            <th>문항 번호</th>
+            <th>문항 ID</th>
+            <th>주제</th>
+            <th>문항</th>
+            <th>응답</th>
+            <th>정답</th>
+            <th>정오 여부</th>
+            <th>제출 시각</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in results %}
+            <tr>
+                <td>{{ row['user'] }}</td>
+                <td>{{ row['question_number'] }}</td>
+                <td>{{ row['question_id'] }}</td>
+                <td>{{ row['topic'] }}</td>
+                <td>{{ row['question'] }}</td>
+                <td>{{ row['selected'] if row['selected'] is not none else '-' }}</td>
+                <td>{{ row['answer'] }}</td>
+                <td>
+                    {% if row['correct'] is none %}
+                        미응답
+                    {% elif row['correct'] %}
+                        정답
+                    {% else %}
+                        오답
+                    {% endif %}
+                </td>
+                <td>{{ row['timestamp'] or '-' }}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2>문항별 통계</h2>
+<table>
+    <thead>
+        <tr>
+            <th>문항 번호</th>
+            <th>응답 수</th>
+            <th>정답 수</th>
+            <th>정답률 (%)</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in per_question %}
+            <tr>
+                <td>{{ item['question_number'] }}</td>
+                <td>{{ item['answered'] }}</td>
+                <td>{{ item['correct'] }}</td>
+                <td>
+                    {% if item['accuracy'] is none %}
+                        -
+                    {% else %}
+                        {{ '%.1f'|format(item['accuracy']) }}
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
