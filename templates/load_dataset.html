@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>문항 데이터 로드</h1>
+<form method="post">
+    <label for="path">서버 내 JSON 파일 경로</label><br>
+    <input type="text" id="path" name="path" style="width: 100%;" required>
+    <div class="actions">
+        <button class="btn" type="submit">로드</button>
+    </div>
+</form>
+<p>새로운 파일을 로드하면 기존 응답이 삭제됩니다.</p>
+{% endblock %}

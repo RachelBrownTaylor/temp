@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>문항 {{ question['numbering_temp'] }}</h1>
+<div class="flex">
+    <div style="flex: 1;">
+        <p><strong>문항 ID:</strong> {{ question['id'] }}</p>
+        <p><strong>주제:</strong> {{ question['topic'] }}</p>
+        <p>{{ question['question'] }}</p>
+        <form method="post">
+            <div>
+                {% for choice in choices %}
+                    <div style="margin-bottom: 8px;">
+                        <label>
+                            <input type="radio" name="choice" value="{{ loop.index }}" {% if selected_choice == loop.index %}checked{% endif %}>
+                            {{ loop.index }}. {{ choice }}
+                        </label>
+                    </div>
+                {% endfor %}
+            </div>
+            <div class="actions">
+                <button class="btn" type="submit" name="action" value="stay">저장</button>
+                <button class="btn" type="submit" name="action" value="prev">이전</button>
+                <button class="btn" type="submit" name="action" value="next">다음</button>
+            </div>
+        </form>
+    </div>
+    <div class="progress-panel">
+        <h3>진행 현황</h3>
+        {% for item in progress %}
+            <div class="progress-item">
+                <form method="get" action="{{ url_for('question', numbering=item['number']) }}">
+                    <button class="link-button" type="submit">{{ item['number'] }}</button>
+                </form>
+                <span>{{ '완료' if item['answered'] else '미응답' }}</span>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
