@@ -97,11 +97,6 @@ def create_default_admin():
             (username, generate_password_hash(password), "admin"),
         )
         db.commit()
-
-
-create_default_admin()
-
-
 def create_default_user():
     username = os.environ.get("DEFAULT_USER_USERNAME")
     password = os.environ.get("DEFAULT_USER_PASSWORD")
@@ -117,7 +112,9 @@ def create_default_user():
         db.commit()
 
 
-create_default_user()
+with app.app_context():
+    create_default_admin()
+    create_default_user()
 
 
 def login_required(role=None):
