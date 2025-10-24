@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>카테고리 선택 - LLM 평가 도구</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h2>LLM 평가 도구</h2>
+            <div class="navbar-right">
+                <span class="username">{{ session.username }}</span>
+                {% if session.role == 'admin' %}
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">관리자 페이지</a>
+                {% endif %}
+                <a href="{{ url_for('main.logout') }}" class="btn btn-secondary">로그아웃</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>평가 카테고리 선택</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if categories %}
+            <div class="category-grid">
+                {% for category in categories %}
+                    <a href="{{ url_for('main.evaluate_category', category=category) }}" class="category-card">
+                        <h3>{{ category }}</h3>
+                        <p>평가 시작하기 →</p>
+                    </a>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-warning">
+                평가할 카테고리가 없습니다. 관리자에게 문의하세요.
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>

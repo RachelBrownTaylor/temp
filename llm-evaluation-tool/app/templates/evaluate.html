@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>평가 - {{ category }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- KaTeX for LaTeX rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h2>{{ category }}</h2>
+            <div class="navbar-right">
+                <span class="username">{{ session.username }}</span>
+                <a href="{{ url_for('main.select_category') }}" class="btn btn-secondary">카테고리 목록</a>
+                <a href="{{ url_for('main.logout') }}" class="btn btn-secondary">로그아웃</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="evaluate-container">
+        <!-- Main evaluation area -->
+        <div class="evaluate-main">
+            <div id="alert-container"></div>
+
+            <!-- Example navigation -->
+            <div class="example-nav">
+                <button id="prev-example" class="btn btn-secondary">← 이전 문제</button>
+                <span id="example-info" class="example-info"></span>
+                <button id="next-example" class="btn btn-secondary">다음 문제 →</button>
+            </div>
+
+            <!-- History display -->
+            <div class="history-section">
+                <h3>대화 히스토리</h3>
+                <div id="history-container" class="history-container"></div>
+            </div>
+
+            <!-- Model response display -->
+            <div class="response-section">
+                <div class="response-header">
+                    <h3>모델 응답: <span id="current-model"></span></h3>
+                    <div class="model-nav">
+                        <button id="prev-model" class="btn btn-secondary">← 이전 모델</button>
+                        <span id="model-info"></span>
+                        <button id="next-model" class="btn btn-secondary">다음 모델 →</button>
+                    </div>
+                </div>
+                <div id="response-container" class="response-container"></div>
+            </div>
+
+            <!-- Rating section -->
+            <div class="rating-section">
+                <h3>평가하기</h3>
+                <div class="star-rating">
+                    <span class="star" data-rating="1">☆</span>
+                    <span class="star" data-rating="2">☆</span>
+                    <span class="star" data-rating="3">☆</span>
+                    <span class="star" data-rating="4">☆</span>
+                    <span class="star" data-rating="5">☆</span>
+                </div>
+                <div class="rating-info">
+                    <span id="rating-text">평점을 선택하세요</span>
+                </div>
+                <button id="save-rating" class="btn btn-primary" disabled>별점 저장</button>
+            </div>
+        </div>
+
+        <!-- Progress sidebar -->
+        <div class="progress-sidebar">
+            <h3>진행 상황</h3>
+            <div id="progress-list" class="progress-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // Data from Flask
+        const examples = {{ examples | tojson }};
+        const initialProgress = {{ progress | tojson }};
+        const category = {{ category | tojson }};
+
+        // State
+        let currentExampleIndex = 0;
+        let currentModelIndex = 0;
+        let currentRating = 0;
+        let progress = initialProgress;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            renderExample();
+            renderProgress();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Example navigation
+            document.getElementById('prev-example').addEventListener('click', () => {
+                if (currentExampleIndex > 0) {
+                    currentExampleIndex--;
+                    currentModelIndex = 0;
+                    currentRating = 0;
+                    renderExample();
+                }
+            });
+
+            document.getElementById('next-example').addEventListener('click', () => {
+                if (currentExampleIndex < examples.length - 1) {
+                    currentExampleIndex++;
+                    currentModelIndex = 0;
+                    currentRating = 0;
+                    renderExample();
+                }
+            });
+
+            // Model navigation
+            document.getElementById('prev-model').addEventListener('click', () => {
+                const currentExample = examples[currentExampleIndex];
+                if (currentModelIndex > 0) {
+                    currentModelIndex--;
+                    currentRating = 0;
+                    renderModel();
+                }
+            });
+
+            document.getElementById('next-model').addEventListener('click', () => {
+                const currentExample = examples[currentExampleIndex];
+                if (currentModelIndex < currentExample.responses.length - 1) {
+                    currentModelIndex++;
+                    currentRating = 0;
+                    renderModel();
+                }
+            });
+
+            // Star rating
+            document.querySelectorAll('.star').forEach(star => {
+                star.addEventListener('click', function() {
+                    currentRating = parseInt(this.getAttribute('data-rating'));
+                    updateStars();
+                    document.getElementById('save-rating').disabled = false;
+                });
+            });
+
+            // Save rating
+            document.getElementById('save-rating').addEventListener('click', saveRating);
+        }
+
+        function renderExample() {
+            const example = examples[currentExampleIndex];
+
+            // Update example info
+            document.getElementById('example-info').textContent =
+                `문제 ${currentExampleIndex + 1} / ${examples.length} (ID: ${example.example_id})`;
+
+            // Disable/enable navigation buttons
+            document.getElementById('prev-example').disabled = currentExampleIndex === 0;
+            document.getElementById('next-example').disabled = currentExampleIndex === examples.length - 1;
+
+            // Render history
+            renderHistory(example.history);
+
+            // Render model response
+            renderModel();
+        }
+
+        function renderHistory(history) {
+            const container = document.getElementById('history-container');
+            container.innerHTML = '';
+
+            history.forEach((turn, index) => {
+                const turnDiv = document.createElement('div');
+                turnDiv.className = `history-turn ${turn.role}`;
+
+                const roleLabel = document.createElement('div');
+                roleLabel.className = 'role-label';
+                roleLabel.textContent = turn.role === 'user' ? '👤 사용자' : '🤖 어시스턴트';
+
+                const content = document.createElement('div');
+                content.className = 'turn-content';
+                content.innerHTML = marked.parse(turn.content);
+
+                turnDiv.appendChild(roleLabel);
+                turnDiv.appendChild(content);
+                container.appendChild(turnDiv);
+            });
+
+            // Render LaTeX
+            renderMathInElement(container, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\[', right: '\\]', display: true},
+                    {left: '\\(', right: '\\)', display: false}
+                ]
+            });
+        }
+
+        function renderModel() {
+            const example = examples[currentExampleIndex];
+            const response = example.responses[currentModelIndex];
+
+            // Update model info
+            document.getElementById('current-model').textContent = response.model;
+            document.getElementById('model-info').textContent =
+                `모델 ${currentModelIndex + 1} / ${example.responses.length}`;
+
+            // Disable/enable model navigation
+            document.getElementById('prev-model').disabled = currentModelIndex === 0;
+            document.getElementById('next-model').disabled = currentModelIndex === example.responses.length - 1;
+
+            // Render response
+            const container = document.getElementById('response-container');
+            container.innerHTML = marked.parse(response.output);
+
+            // Render LaTeX
+            renderMathInElement(container, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false},
+                    {left: '\\[', right: '\\]', display: true},
+                    {left: '\\(', right: '\\)', display: false}
+                ]
+            });
+
+            // Load existing rating
+            loadExistingRating();
+        }
+
+        function loadExistingRating() {
+            const example = examples[currentExampleIndex];
+            const response = example.responses[currentModelIndex];
+            const exampleProgress = progress.find(p => p.example_id === example.example_id);
+
+            if (exampleProgress && exampleProgress.ratings[response.model]) {
+                currentRating = exampleProgress.ratings[response.model];
+                updateStars();
+                document.getElementById('save-rating').disabled = false;
+            } else {
+                currentRating = 0;
+                updateStars();
+                document.getElementById('save-rating').disabled = true;
+            }
+        }
+
+        function updateStars() {
+            document.querySelectorAll('.star').forEach(star => {
+                const rating = parseInt(star.getAttribute('data-rating'));
+                star.textContent = rating <= currentRating ? '★' : '☆';
+            });
+
+            if (currentRating > 0) {
+                document.getElementById('rating-text').textContent = `선택한 평점: ${currentRating}점`;
+            } else {
+                document.getElementById('rating-text').textContent = '평점을 선택하세요';
+            }
+        }
+
+        function saveRating() {
+            const example = examples[currentExampleIndex];
+            const response = example.responses[currentModelIndex];
+
+            fetch('/api/rating', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    example_id: example.example_id,
+                    model_name: response.model,
+                    rating: currentRating
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('평가가 저장되었습니다.', 'success');
+                    updateProgress();
+                } else {
+                    showAlert(data.message || '저장 중 오류가 발생했습니다.', 'error');
+                }
+            })
+            .catch(error => {
+                showAlert('네트워크 오류가 발생했습니다.', 'error');
+            });
+        }
+
+        function updateProgress() {
+            fetch(`/api/progress/${category}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        progress = data.progress;
+                        renderProgress();
+                    }
+                });
+        }
+
+        function renderProgress() {
+            const container = document.getElementById('progress-list');
+            container.innerHTML = '';
+
+            progress.forEach((item, index) => {
+                const example = examples.find(e => e.example_id === item.example_id);
+                const totalModels = example.responses.length;
+                const ratedModels = Object.keys(item.ratings).length;
+                const isComplete = ratedModels === totalModels;
+
+                const progressItem = document.createElement('div');
+                progressItem.className = `progress-item ${index === currentExampleIndex ? 'active' : ''}`;
+                progressItem.innerHTML = `
+                    <div class="progress-id">#${item.example_id}</div>
+                    <div class="progress-status ${isComplete ? 'complete' : 'incomplete'}">
+                        ${isComplete ? '✓ 채점 완료' : `진행 중 (${ratedModels}/${totalModels})`}
+                    </div>
+                    <div class="progress-ratings">
+                        ${Object.values(item.ratings).map(r => '★'.repeat(r)).join(' ')}
+                    </div>
+                `;
+
+                progressItem.addEventListener('click', () => {
+                    currentExampleIndex = index;
+                    currentModelIndex = 0;
+                    currentRating = 0;
+                    renderExample();
+                    renderProgress();
+                });
+
+                container.appendChild(progressItem);
+            });
+        }
+
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+
+            const container = document.getElementById('alert-container');
+            container.innerHTML = '';
+            container.appendChild(alertDiv);
+
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
