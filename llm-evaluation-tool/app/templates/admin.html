@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 페이지</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <h2>관리자 페이지</h2>
+            <div class="navbar-right">
+                <span class="username">{{ session.username }} (관리자)</span>
+                <a href="{{ url_for('main.select_category') }}" class="btn btn-secondary">평가하기</a>
+                <a href="{{ url_for('main.logout') }}" class="btn btn-secondary">로그아웃</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>관리자 대시보드</h1>
+
+        <div id="alert-container"></div>
+
+        <!-- Dataset Management -->
+        <section class="admin-section">
+            <h2>데이터셋 관리</h2>
+            <div class="dataset-loader">
+                <label for="dataset-path">데이터셋 파일 경로:</label>
+                <input type="text" id="dataset-path" placeholder="/app/data/llm_evaluation.json">
+                <button id="load-dataset" class="btn btn-primary">데이터셋 로드</button>
+            </div>
+        </section>
+
+        <!-- Export Section -->
+        <section class="admin-section">
+            <h2>데이터 내보내기</h2>
+            <div class="export-buttons">
+                <a href="{{ url_for('admin.export_ratings', format='csv') }}" class="btn btn-primary">CSV 내보내기</a>
+                <a href="{{ url_for('admin.export_ratings', format='json') }}" class="btn btn-primary">JSON 내보내기</a>
+            </div>
+        </section>
+
+        <!-- Statistics -->
+        <section class="admin-section">
+            <h2>통계 요약</h2>
+
+            <!-- By Model -->
+            <div class="stats-subsection">
+                <h3>모델별 평균 점수</h3>
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>모델</th>
+                            <th>평균 점수</th>
+                            <th>평가 수</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in stats.by_model %}
+                        <tr>
+                            <td>{{ stat.model_name }}</td>
+                            <td>{{ "%.2f"|format(stat.avg_rating) }}</td>
+                            <td>{{ stat.count }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not stats.by_model %}
+                        <tr>
+                            <td colspan="3" class="no-data">데이터가 없습니다.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- By Category -->
+            <div class="stats-subsection">
+                <h3>카테고리별 평균 점수</h3>
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>카테고리</th>
+                            <th>평균 점수</th>
+                            <th>평가 수</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in stats.by_category %}
+                        <tr>
+                            <td>{{ stat.category }}</td>
+                            <td>{{ "%.2f"|format(stat.avg_rating) }}</td>
+                            <td>{{ stat.count }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not stats.by_category %}
+                        <tr>
+                            <td colspan="3" class="no-data">데이터가 없습니다.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- By Model and Category -->
+            <div class="stats-subsection">
+                <h3>모델 × 카테고리별 평균 점수</h3>
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>카테고리</th>
+                            <th>모델</th>
+                            <th>평균 점수</th>
+                            <th>평가 수</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stat in stats.by_model_category %}
+                        <tr>
+                            <td>{{ stat.category }}</td>
+                            <td>{{ stat.model_name }}</td>
+                            <td>{{ "%.2f"|format(stat.avg_rating) }}</td>
+                            <td>{{ stat.count }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not stats.by_model_category %}
+                        <tr>
+                            <td colspan="4" class="no-data">데이터가 없습니다.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Recent Ratings -->
+        <section class="admin-section">
+            <h2>최근 평가 내역</h2>
+            <div class="ratings-table-container">
+                <table class="stats-table">
+                    <thead>
+                        <tr>
+                            <th>예제 ID</th>
+                            <th>카테고리</th>
+                            <th>모델</th>
+                            <th>평가자</th>
+                            <th>점수</th>
+                            <th>시간</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rating in ratings[:50] %}
+                        <tr>
+                            <td>{{ rating.example_id }}</td>
+                            <td>{{ rating.category }}</td>
+                            <td>{{ rating.model_name }}</td>
+                            <td>{{ rating.evaluator_username }}</td>
+                            <td>{{ '★' * rating.rating }}</td>
+                            <td>{{ rating.timestamp }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if not ratings %}
+                        <tr>
+                            <td colspan="6" class="no-data">평가 내역이 없습니다.</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+                {% if ratings|length > 50 %}
+                <p class="table-note">최근 50개만 표시됩니다. 전체 데이터는 내보내기를 이용하세요.</p>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+
+    <script>
+        document.getElementById('load-dataset').addEventListener('click', function() {
+            const path = document.getElementById('dataset-path').value.trim();
+
+            if (!path) {
+                showAlert('파일 경로를 입력하세요.', 'error');
+                return;
+            }
+
+            fetch('/admin/load_dataset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ dataset_path: path })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showAlert(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showAlert('네트워크 오류가 발생했습니다.', 'error');
+            });
+        });
+
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+
+            const container = document.getElementById('alert-container');
+            container.innerHTML = '';
+            container.appendChild(alertDiv);
+
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
